@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 
 import gym
+import requests
+import logging
+
+from .showdown_client import ShowdownClient
+
+logger = logging.getLogger(__name__)
 
 
 class ShowdownEnv(gym.Env):
@@ -9,16 +15,12 @@ class ShowdownEnv(gym.Env):
     OpenAI gym environment.
     """
 
-    metadata = {"render.modes": ["human"]}
-
     def __init__(self):
-        pass
+        self.client = ShowdownClient()
+        self.reset()
 
     def step(self, action):
         pass
 
     def reset(self):
-        pass
-
-    def render(self, mode="human", close=False):
         pass

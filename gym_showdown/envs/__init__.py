@@ -1,1 +1,1 @@
-from gym_foo.envs.showdown_env import ShowdownEnv
+from gym_showdown.envs.showdown_env import ShowdownEnv

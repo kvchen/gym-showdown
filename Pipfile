@@ -4,10 +4,12 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+requests = "*"
 gym = "*"
-websockets = "*"
 
 [dev-packages]
+pylint = "*"
+black = "*"
 
 [requires]
 python_version = "3.6"
