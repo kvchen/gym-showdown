@@ -4,7 +4,7 @@ from gym import Env, spaces
 from typing import Tuple
 import logging
 import numpy as np
-import requests
+import random
 
 from .showdown_client import ShowdownClient
 
@@ -49,36 +49,29 @@ class ShowdownEnv(Env):
         current_battle_id = self.current_battle["id"]
         current_battle_data = self.current_battle["data"]
 
-        # moves = [None, None]
-        # for side_idx, side in enumerate(current_battle_data["sides"]):
-        #     request = side["currentRequest"]
-        #     move_idx = actions[side_idx]
-        #     move = self.ALL_ACTIONS[move_idx]
+        move_idxs = [action_idx, random.randint(0, len(self.MOVE_ACTIONS))]
+        moves = [None, None]
+        for side_idx, side in enumerate(current_battle_data["sides"]):
+            request = side["currentRequest"]
+            move_idx = move_idxs[side_idx]
+            move = self.ALL_ACTIONS[move_idx]
 
-        #     # Ensure that we aren't attempting an invalid move
-        #     if request == "move":
-        #         pass
-        #     elif request == "wait":
-        #         move = None
-        #     else:
-        #         move = self.DEFAULT_ACTION
+            # Ensure that we aren't attempting an invalid move
+            if request == "move":
+                pass
+            elif request == "wait":
+                move = None
+            else:
+                move = self.DEFAULT_ACTION
 
-        #     moves[side_idx] = move
+            moves[side_idx] = move
 
-        # Ensure that the agent doesn't try to take an invalid move.
-        sides = current_battle_data["sides"]
-        request = sides[0]["currentRequest"]
-
-        move = self.ALL_ACTIONS[action_idx]
-        if request == "move":
-            pass
-        elif request == "wait":
-            move = None
-        else:
-            move = self.DEFAULT_ACTION
-
-        payload = self.client.do_move(current_battle_id, move, "default")
+        payload = self.client.do_move(current_battle_id, *moves)
         self.current_battle = payload
+
+        sides = payload["data"]["sides"]
+        assert not sides[0]["choiceError"], sides[0]["choiceError"]
+        assert not sides[1]["choiceError"], sides[1]["choiceError"]
 
         battle_data = payload["data"]
         features = self._get_features(battle_data)
