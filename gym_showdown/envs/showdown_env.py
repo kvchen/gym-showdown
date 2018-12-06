@@ -18,13 +18,14 @@ class ShowdownEnv(Env):
     """
 
     NUM_FEATURES = 504
-    DEFAULT_ACTION = "default"
+
     MOVE_ACTIONS = [f"move {slot}" for slot in range(1, 5)]
     SWITCH_ACTIONS = [f"switch {slot}" for slot in range(2, 7)]
     STALL_ACTIONS = ["pass"]
+    NOOP_ACTIONS = [None]
 
     # Excludes default action! We want the agent to choose the actions.
-    ALL_ACTIONS = MOVE_ACTIONS + SWITCH_ACTIONS + STALL_ACTIONS
+    ALL_ACTIONS = MOVE_ACTIONS + SWITCH_ACTIONS + STALL_ACTIONS + NOOP_ACTIONS
 
     # Possible categories for categorical features
     TERRAINS = ["electricterrain", "grassyterrain", "mistyterrain", "psychicterrain"]
@@ -56,22 +57,13 @@ class ShowdownEnv(Env):
         current_battle_id = self.current_battle["id"]
         current_battle_data = self.current_battle["data"]
 
-        move_idxs = [action_idx, random.randint(0, len(self.MOVE_ACTIONS))]
-        moves = [None, None]
-        for side_idx, side in enumerate(current_battle_data["sides"]):
-            request = side["currentRequest"]
-            move_idx = move_idxs[side_idx]
-            move = self.ALL_ACTIONS[move_idx]
+        # P2 random agent code.
+        # TODO: Refactor this into a separate module
+        p2_actions = self.current_battle["actions"][1]
+        p2_move_idx = random.choice(p2_actions)
 
-            # Ensure that we aren't attempting an invalid move
-            if request == "move":
-                pass
-            elif request == "wait":
-                move = None
-            else:
-                move = self.DEFAULT_ACTION
-
-            moves[side_idx] = move
+        move_idxs = [action_idx, p2_move_idx]
+        moves = [self.ALL_ACTIONS[move_idx] for move_idx in move_idxs]
 
         payload = self.client.do_move(current_battle_id, *moves)
         self.current_battle = payload
@@ -81,7 +73,8 @@ class ShowdownEnv(Env):
         assert not sides[1]["choiceError"], sides[1]["choiceError"]
 
         battle_data = payload["data"]
-        features = self._get_features(battle_data)
+
+        features = self._get_features(battle_data, payload["actions"])
         reward = self._get_reward(battle_data)
         is_terminal = self._is_terminal(battle_data)
 
@@ -95,7 +88,7 @@ class ShowdownEnv(Env):
 
         self.initial_battle_id = initial_battle_id
         self.current_battle = payload
-        return self._get_features(payload["data"])
+        return self._get_features(payload["data"], payload["actions"])
 
     def close(self):
         if self.initial_battle_id is not None:
@@ -108,10 +101,15 @@ class ShowdownEnv(Env):
     def _is_terminal(self, battle_data) -> bool:
         return battle_data["ended"]
 
-    def _get_features(self, battle_data):
+    def _get_features(self, battle_data, battle_actions):
         # TODO: Add terrain and weather
         side_features = [self._get_side_features(side) for side in battle_data["sides"]]
-        return np.concatenate(side_features)
+        features = np.concatenate(side_features)
+
+        # Mask out valid actions
+        action_mask = np.zeros(len(self.ALL_ACTIONS))
+        action_mask[battle_actions[0]] = 1
+        return features, action_mask[None, :]
 
     def _get_side_features(self, side_data):
         pokemon_features = [
