@@ -26,6 +26,13 @@ class ShowdownEnv(Env):
     # Excludes default action! We want the agent to choose the actions.
     ALL_ACTIONS = MOVE_ACTIONS + SWITCH_ACTIONS + STALL_ACTIONS
 
+    # Possible categories for categorical features
+    TERRAINS = ["electricterrain", "grassyterrain", "mistyterrain", "psychicterrain"]
+    WEATHERS = ["raindance", "primordialsea", "sunnyday", "desolateland", "sandstorm", "hail", "deltastream"]
+    STATUSES = ["brn", "par", "slp", "frz", "psn", "tox"]
+    TYPES = ["Bug", "Datk", "Dragon", "Electric", "Fairy", "Fighting", "Fire", "Flying", "Ghost", "Grass", "Ground", "Ice", "Normal", "Poison", "Psychic", "Rock", "Steel", "Water"]
+    TARGETS = ["all", "foeSide", "allySide", "allyTeam", "allAdjacent", "allAdjacentFoes", "normal", "self", "any", "scripted", "adjacentAlly", "adjacentFoe", "adjacentAllyOrSelf", "randomNormal"]
+
     def __init__(self, options=None):
         self.num_actions = len(self.ALL_ACTIONS)
         self.action_space = spaces.Discrete(self.num_actions)
