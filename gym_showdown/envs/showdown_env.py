@@ -27,7 +27,7 @@ class ShowdownEnv(Env):
     # Excludes default action! We want the agent to choose the actions.
     ALL_ACTIONS = MOVE_ACTIONS + SWITCH_ACTIONS + STALL_ACTIONS + NOOP_ACTIONS
 
-    def __init__(self, options=None):
+    def __init__(self, opp_agent, options=None):
         self.num_actions = len(self.ALL_ACTIONS)
         self.action_space = spaces.Discrete(self.num_actions)
 
@@ -37,26 +37,20 @@ class ShowdownEnv(Env):
         )
 
         self.client = ShowdownClient()
+        self.opp_agent = opp_agent
         self.options = options or {}
 
         self.initial_battle_id = None
         self.current_battle = None
 
     def step(self, action_idx: int):
-        """Takes a single step for player 1."""
         assert self.current_battle is not None
-        assert action_idx < self.num_actions
 
         current_battle_id = self.current_battle["id"]
-        current_battle_data = self.current_battle["data"]
+        opp_move_idx = self.opp_agent(self)
 
-        # P2 random agent code.
-        # TODO: Refactor this into a separate module
-        p2_actions = self.current_battle["actions"][1]
-        p2_move_idx = random.choice(p2_actions)
-
-        move_idxs = [action_idx, p2_move_idx]
-        moves = [self.ALL_ACTIONS[move_idx] for move_idx in move_idxs]
+        move_idxs = [action_idx, opp_move_idx]
+        moves = [self.get_move(move_idx) for move_idx in move_idxs]
 
         payload = self.client.do_move(current_battle_id, *moves)
         self.current_battle = payload
@@ -90,6 +84,10 @@ class ShowdownEnv(Env):
             self.current_battle = None
 
     # HELPER METHODS
+
+    def get_move(self, move_idx):
+        assert move_idx < len(self.ALL_ACTIONS)
+        return self.ALL_ACTIONS[move_idx]
 
     def _is_terminal(self, battle_data) -> bool:
         return battle_data["ended"]
