@@ -7,6 +7,7 @@ import numpy as np
 import random
 
 from .showdown_client import ShowdownClient
+from .data import ALL_ACTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -19,24 +20,8 @@ class ShowdownEnv(Env):
 
     NUM_FEATURES = 504
 
-    MOVE_ACTIONS = [f"move {slot}" for slot in range(1, 5)]
-    SWITCH_ACTIONS = [f"switch {slot}" for slot in range(2, 7)]
-    STALL_ACTIONS = ["pass"]
-    NOOP_ACTIONS = [None]
-
-    # Excludes default action! We want the agent to choose the actions.
-    ALL_ACTIONS = MOVE_ACTIONS + SWITCH_ACTIONS + STALL_ACTIONS + NOOP_ACTIONS
-
-    # Possible categories for categorical features
-    TERRAINS = ["electricterrain", "grassyterrain", "mistyterrain", "psychicterrain"]
-    WEATHERS = ["raindance", "primordialsea", "sunnyday", "desolateland", "sandstorm", "hail", "deltastream"]
-    STATUSES = ["brn", "par", "slp", "frz", "psn", "tox"]
-    TYPES = ["Bug", "Datk", "Dragon", "Electric", "Fairy", "Fighting", "Fire", "Flying", "Ghost", "Grass", "Ground", "Ice", "Normal", "Poison", "Psychic", "Rock", "Steel", "Water"]
-    TARGETS = ["all", "foeSide", "allySide", "allyTeam", "allAdjacent", "allAdjacentFoes", "normal", "self", "any", "scripted", "adjacentAlly", "adjacentFoe", "adjacentAllyOrSelf", "randomNormal"]
-
     def __init__(self, opp_agent, options=None):
-        self.num_actions = len(self.ALL_ACTIONS)
-        self.action_space = spaces.Discrete(self.num_actions)
+        self.action_space = spaces.Discrete(len(ALL_ACTIONS))
 
         # TODO: Figure out what this observation space should look like
         self.observation_space = spaces.Box(
@@ -100,8 +85,8 @@ class ShowdownEnv(Env):
     # HELPER METHODS
 
     def get_move(self, move_idx):
-        assert move_idx < len(self.ALL_ACTIONS)
-        return self.ALL_ACTIONS[move_idx]
+        assert move_idx < len(ALL_ACTIONS)
+        return ALL_ACTIONS[move_idx]
 
     def _is_terminal(self, battle_data) -> bool:
         return battle_data["ended"]
@@ -112,7 +97,7 @@ class ShowdownEnv(Env):
         features = np.concatenate(side_features)
 
         # Mask out valid actions
-        action_mask = np.zeros(len(self.ALL_ACTIONS))
+        action_mask = np.zeros(len(ALL_ACTIONS))
         action_mask[battle_actions[0]] = 1
         return features, action_mask[None, :]
 
