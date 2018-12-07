@@ -50,6 +50,13 @@ class ShowdownEnv(Env):
         self.initial_battle_id = None
         self.current_battle = None
 
+    def render(self, mode):
+        if mode == "ansi":
+            log = self.current_battle["data"]["inputLog"]
+            return "\n".join(log)
+        else:
+            super().render(mode=mode)
+
     def step(self, action_idx: int):
         assert self.current_battle is not None
 
