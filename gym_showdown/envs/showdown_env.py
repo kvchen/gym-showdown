@@ -76,6 +76,14 @@ class ShowdownEnv(Env):
         self.current_battle = payload
         return self._get_features(payload["data"], payload["actions"])
 
+    def seed(self, seed):
+        if seed is not None:
+            self.options[seed] = seed
+        else:
+            seed = self.current_battle["seed"]
+
+        return [seed]
+
     def close(self):
         if self.initial_battle_id is not None:
             self.client.remove_battle(self.initial_battle_id)
