@@ -5,11 +5,16 @@ from typing import Tuple
 import logging
 import numpy as np
 import random
+from sklearn.preprocessing import OneHotEncoder
 
 from .showdown_client import ShowdownClient
 
 logger = logging.getLogger(__name__)
 
+
+def fit_ohe(categories):
+        ohe = OneHotEncoder(sparse=False, handle_unknown='ignore')
+        return ohe.fit(np.reshape(categories, (-1, 1)))
 
 class ShowdownEnv(Env):
     """
@@ -17,7 +22,7 @@ class ShowdownEnv(Env):
     OpenAI gym environment.
     """
 
-    NUM_FEATURES = 504
+    NUM_FEATURES = 2519
 
     MOVE_ACTIONS = [f"move {slot}" for slot in range(1, 5)]
     SWITCH_ACTIONS = [f"switch {slot}" for slot in range(2, 7)]
@@ -31,7 +36,9 @@ class ShowdownEnv(Env):
     TERRAINS = ["electricterrain", "grassyterrain", "mistyterrain", "psychicterrain"]
     WEATHERS = ["raindance", "primordialsea", "sunnyday", "desolateland", "sandstorm", "hail", "deltastream"]
     STATUSES = ["brn", "par", "slp", "frz", "psn", "tox"]
-    TYPES = ["Bug", "Datk", "Dragon", "Electric", "Fairy", "Fighting", "Fire", "Flying", "Ghost", "Grass", "Ground", "Ice", "Normal", "Poison", "Psychic", "Rock", "Steel", "Water"]
+    GENDERS = ["M", "F", "N"]
+    TYPES = ["Bug", "Dark", "Dragon", "Electric", "Fairy", "Fighting", "Fire", "Flying", "Ghost", "Grass", "Ground", "Ice", "Normal", "Poison", "Psychic", "Rock", "Steel", "Water"]
+    CATEGORIES = ["Physical", "Special", "Status"]
     TARGETS = ["all", "foeSide", "allySide", "allyTeam", "allAdjacent", "allAdjacentFoes", "normal", "self", "any", "scripted", "adjacentAlly", "adjacentFoe", "adjacentAllyOrSelf", "randomNormal"]
 
     def __init__(self, options=None):
@@ -48,6 +55,14 @@ class ShowdownEnv(Env):
 
         self.initial_battle_id = None
         self.current_battle = None
+
+        self.terrain_ohe = fit_ohe(TERRAINS)
+        self.weather_ohe = fit_ohe(WEATHERS)
+        self.status_ohe = fit_ohe(STATUSES)
+        self.gender_ohe = fit_ohe(GENDERS)
+        self.type_ohe = fit_ohe(TYPES)
+        self.category_ohe = fit_ohe(CATEGORIES)
+        self.target_ohe = fit_ohe(TARGETS)
 
     def step(self, action_idx: int):
         """Takes a single step for player 1."""
@@ -103,8 +118,10 @@ class ShowdownEnv(Env):
 
     def _get_features(self, battle_data, battle_actions):
         # TODO: Add terrain and weather
+        terrain_onehot = self.terrain_ohe.transform([battle_data["terrain"]])
+        weather_onehot = self.weather_ohe.transform([battle_data["weather"]])
         side_features = [self._get_side_features(side) for side in battle_data["sides"]]
-        features = np.concatenate(side_features)
+        features = np.concatenate([*terrain_onehot, *weather_onehot, *side_features])
 
         # Mask out valid actions
         action_mask = np.zeros(len(self.ALL_ACTIONS))
@@ -125,7 +142,12 @@ class ShowdownEnv(Env):
         stats = pokemon_data["stats"]
         boosts = [(boost + 6) / 12 for boost in pokemon_data["boosts"].values()]
 
-        # TODO: Add categorical features
+        status_onehot = self.status_ohe.transform([pokemon_data["status"]])
+        gender_onehot = self.gender_ohe.transform([pokemon_data["gender"]])
+        type_onehot = self.type_ohe.transform([[typ] for typ in pokemon_data["types"]])
+        type_onehot = np.sum(type_onehot, axis=0)
+
+        # TODO: Add speciesnum, abilitynum, itemnum
         return np.concatenate(
             [
                 [
@@ -144,22 +166,36 @@ class ShowdownEnv(Env):
                     # Boosts
                     *boosts,
                 ],
+                *status_onehot,
+                *gender_onehot,
+                type_onehot,
                 *move_features,
             ]
         )
 
     def _get_move_features(self, move_data):
         if move_data is None:
-            return np.zeros((6,))
+            return np.zeros((41,))
 
-        return np.array(
+        accuracy = 100 if type(move_data["accuracy"]) == bool else move_data["accuracy"]
+        category_onehot = self.category_ohe.transform([move_data["category"]])
+        target_onehot = self.target_ohe.transform([move_data["target"]])
+        type_onehot = self.type_ohe.transform([move_data["type"]])
+
+        # TODO: Add movenum
+        return np.concatenate(
             [
-                move_data["accuracy"],
-                move_data["basePower"],
-                move_data["priority"],
-                move_data["pp"],
-                move_data["maxpp"],
-                move_data["disabled"],
+                [
+                    accuracy,
+                    move_data["basePower"],
+                    move_data["priority"],
+                    move_data["pp"],
+                    move_data["maxpp"],
+                    move_data["disabled"],
+                ],
+                *category_onehot,
+                *target_onehot,
+                *type_onehot,
             ]
         )
 
