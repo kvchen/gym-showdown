@@ -8,6 +8,7 @@ import random
 from sklearn.preprocessing import OneHotEncoder
 
 from .showdown_client import ShowdownClient
+from .data import ALL_ACTIONS, TERRAINS, WEATHERS, STATUSES, GENDERS, TYPES, CATEGORIES, TARGETS
 
 logger = logging.getLogger(__name__)
 
@@ -24,26 +25,8 @@ class ShowdownEnv(Env):
 
     NUM_FEATURES = 2519
 
-    MOVE_ACTIONS = [f"move {slot}" for slot in range(1, 5)]
-    SWITCH_ACTIONS = [f"switch {slot}" for slot in range(2, 7)]
-    STALL_ACTIONS = ["pass"]
-    NOOP_ACTIONS = [None]
-
-    # Excludes default action! We want the agent to choose the actions.
-    ALL_ACTIONS = MOVE_ACTIONS + SWITCH_ACTIONS + STALL_ACTIONS + NOOP_ACTIONS
-
-    # Possible categories for categorical features
-    TERRAINS = ["electricterrain", "grassyterrain", "mistyterrain", "psychicterrain"]
-    WEATHERS = ["raindance", "primordialsea", "sunnyday", "desolateland", "sandstorm", "hail", "deltastream"]
-    STATUSES = ["brn", "par", "slp", "frz", "psn", "tox"]
-    GENDERS = ["M", "F", "N"]
-    TYPES = ["Bug", "Dark", "Dragon", "Electric", "Fairy", "Fighting", "Fire", "Flying", "Ghost", "Grass", "Ground", "Ice", "Normal", "Poison", "Psychic", "Rock", "Steel", "Water"]
-    CATEGORIES = ["Physical", "Special", "Status"]
-    TARGETS = ["all", "foeSide", "allySide", "allyTeam", "allAdjacent", "allAdjacentFoes", "normal", "self", "any", "scripted", "adjacentAlly", "adjacentFoe", "adjacentAllyOrSelf", "randomNormal"]
-
-    def __init__(self, options=None):
-        self.num_actions = len(self.ALL_ACTIONS)
-        self.action_space = spaces.Discrete(self.num_actions)
+    def __init__(self, opp_agent, options=None):
+        self.action_space = spaces.Discrete(len(ALL_ACTIONS))
 
         # TODO: Figure out what this observation space should look like
         self.observation_space = spaces.Box(
@@ -51,6 +34,7 @@ class ShowdownEnv(Env):
         )
 
         self.client = ShowdownClient()
+        self.opp_agent = opp_agent
         self.options = options or {}
 
         self.initial_battle_id = None
@@ -64,21 +48,21 @@ class ShowdownEnv(Env):
         self.category_ohe = fit_ohe(CATEGORIES)
         self.target_ohe = fit_ohe(TARGETS)
 
+    def render(self, mode):
+        if mode == "ansi":
+            log = self.current_battle["data"]["inputLog"]
+            return "\n".join(log)
+        else:
+            super().render(mode=mode)
+
     def step(self, action_idx: int):
-        """Takes a single step for player 1."""
         assert self.current_battle is not None
-        assert action_idx < self.num_actions
 
         current_battle_id = self.current_battle["id"]
-        current_battle_data = self.current_battle["data"]
+        opp_move_idx = self.opp_agent(self)
 
-        # P2 random agent code.
-        # TODO: Refactor this into a separate module
-        p2_actions = self.current_battle["actions"][1]
-        p2_move_idx = random.choice(p2_actions)
-
-        move_idxs = [action_idx, p2_move_idx]
-        moves = [self.ALL_ACTIONS[move_idx] for move_idx in move_idxs]
+        move_idxs = [action_idx, opp_move_idx]
+        moves = [self.get_move(move_idx) for move_idx in move_idxs]
 
         payload = self.client.do_move(current_battle_id, *moves)
         self.current_battle = payload
@@ -105,6 +89,14 @@ class ShowdownEnv(Env):
         self.current_battle = payload
         return self._get_features(payload["data"], payload["actions"])
 
+    def seed(self, seed):
+        if seed is not None:
+            self.options[seed] = seed
+        else:
+            seed = self.current_battle["seed"]
+
+        return [seed]
+
     def close(self):
         if self.initial_battle_id is not None:
             self.client.remove_battle(self.initial_battle_id)
@@ -112,6 +104,10 @@ class ShowdownEnv(Env):
             self.current_battle = None
 
     # HELPER METHODS
+
+    def get_move(self, move_idx):
+        assert move_idx < len(ALL_ACTIONS)
+        return ALL_ACTIONS[move_idx]
 
     def _is_terminal(self, battle_data) -> bool:
         return battle_data["ended"]
@@ -124,7 +120,7 @@ class ShowdownEnv(Env):
         features = np.concatenate([*terrain_onehot, *weather_onehot, *side_features])
 
         # Mask out valid actions
-        action_mask = np.zeros(len(self.ALL_ACTIONS))
+        action_mask = np.zeros(len(ALL_ACTIONS))
         action_mask[battle_actions[0]] = 1
         return features, action_mask[None, :]
 
