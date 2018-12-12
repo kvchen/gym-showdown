@@ -18,6 +18,7 @@ WEATHERS = [
     "deltastream",
 ]
 STATUSES = ["brn", "par", "slp", "frz", "psn", "tox"]
+GENDERS = ["M", "F", "N"]
 TYPES = [
     "Bug",
     "Datk",
@@ -38,6 +39,7 @@ TYPES = [
     "Steel",
     "Water",
 ]
+CATEGORIES = ["Physical", "Special", "Status"]
 TARGETS = [
     "all",
     "foeSide",

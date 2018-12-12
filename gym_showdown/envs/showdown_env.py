@@ -114,8 +114,8 @@ class ShowdownEnv(Env):
 
     def _get_features(self, battle_data, battle_actions):
         # TODO: Add terrain and weather
-        terrain_onehot = self.terrain_ohe.transform([battle_data["terrain"]])
-        weather_onehot = self.weather_ohe.transform([battle_data["weather"]])
+        terrain_onehot = self.terrain_ohe.transform([[battle_data["terrain"]]])
+        weather_onehot = self.weather_ohe.transform([[battle_data["weather"]]])
         side_features = [self._get_side_features(side) for side in battle_data["sides"]]
         features = np.concatenate([*terrain_onehot, *weather_onehot, *side_features])
 
@@ -138,8 +138,8 @@ class ShowdownEnv(Env):
         stats = pokemon_data["stats"]
         boosts = [(boost + 6) / 12 for boost in pokemon_data["boosts"].values()]
 
-        status_onehot = self.status_ohe.transform([pokemon_data["status"]])
-        gender_onehot = self.gender_ohe.transform([pokemon_data["gender"]])
+        status_onehot = self.status_ohe.transform([[pokemon_data["status"]]])
+        gender_onehot = self.gender_ohe.transform([[pokemon_data["gender"]]])
         type_onehot = self.type_ohe.transform([[typ] for typ in pokemon_data["types"]])
         type_onehot = np.sum(type_onehot, axis=0)
 
@@ -174,9 +174,9 @@ class ShowdownEnv(Env):
             return np.zeros((41,))
 
         accuracy = 100 if type(move_data["accuracy"]) == bool else move_data["accuracy"]
-        category_onehot = self.category_ohe.transform([move_data["category"]])
-        target_onehot = self.target_ohe.transform([move_data["target"]])
-        type_onehot = self.type_ohe.transform([move_data["type"]])
+        category_onehot = self.category_ohe.transform([[move_data["category"]]])
+        target_onehot = self.target_ohe.transform([[move_data["target"]]])
+        type_onehot = self.type_ohe.transform([[move_data["type"]]])
 
         # TODO: Add movenum
         return np.concatenate(
