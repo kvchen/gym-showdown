@@ -147,18 +147,18 @@ class ShowdownEnv(Env):
         return np.concatenate(
             [
                 [
-                    pokemon_data["hp"],
-                    pokemon_data["maxhp"],
+                    pokemon_data["hp"] / 714,
+                    pokemon_data["maxhp"] / 714,
                     pokemon_data["fainted"],
                     pokemon_data["active"],
-                    pokemon_data["happiness"],
-                    pokemon_data["level"],
-                    # Stats
-                    stats["atk"],
-                    stats["def"],
-                    stats["spa"],
-                    stats["spd"],
-                    stats["spe"],
+                    pokemon_data["happiness"] / 255,
+                    pokemon_data["level"] / 100,
+                    # Stats, assuming boosts are not included, normalized to theoretical max
+                    stats["atk"] / 504,
+                    stats["def"] / 614,
+                    stats["spa"] / 504,
+                    stats["spd"] / 614,
+                    stats["spe"] / 504,
                     # Boosts
                     *boosts,
                 ],
@@ -173,7 +173,7 @@ class ShowdownEnv(Env):
         if move_data is None:
             return np.zeros((41,))
 
-        accuracy = 100 if type(move_data["accuracy"]) == bool else move_data["accuracy"]
+        accuracy = 1 if type(move_data["accuracy"]) == bool else move_data["accuracy"] / 100
         category_onehot = self.category_ohe.transform([[move_data["category"]]])
         target_onehot = self.target_ohe.transform([[move_data["target"]]])
         type_onehot = self.type_ohe.transform([[move_data["type"]]])
@@ -183,10 +183,10 @@ class ShowdownEnv(Env):
             [
                 [
                     accuracy,
-                    move_data["basePower"],
-                    move_data["priority"],
-                    move_data["pp"],
-                    move_data["maxpp"],
+                    move_data["basePower"] / 250,
+                    np.clip((move_data["priority"] + 7) / 14, 0, 1),
+                    move_data["pp"] / 64,
+                    move_data["maxpp"] / 64,
                     move_data["disabled"],
                 ],
                 *category_onehot,
