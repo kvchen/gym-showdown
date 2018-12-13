@@ -118,6 +118,7 @@ class ShowdownEnv(Env):
         weather_onehot = self.weather_ohe.transform([[battle_data["weather"]]])
         side_features = [self._get_side_features(side) for side in battle_data["sides"]]
         features = np.concatenate([*terrain_onehot, *weather_onehot, *side_features])
+        assert (features >= 0).all() and (features <= 1).all()
 
         # Mask out valid actions
         action_mask = np.zeros(len(ALL_ACTIONS))
