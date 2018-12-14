@@ -3,6 +3,7 @@
 from gym import Env, spaces
 from typing import Tuple
 import logging
+import time
 import numpy as np
 import random
 from sklearn.preprocessing import OneHotEncoder
@@ -11,6 +12,13 @@ from .showdown_client import ShowdownClient
 from .data import ALL_ACTIONS, TERRAINS, WEATHERS, STATUSES, GENDERS, TYPES, CATEGORIES, TARGETS
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+current_time = int(time.time())
+handler = logging.FileHandler(f"moves_{current_time}.log")
+handler.setLevel(logging.INFO)
+formatter = logging.Formatter("%(asctime)s - %(message)s")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 
 def fit_ohe(categories):
@@ -25,7 +33,7 @@ class ShowdownEnv(Env):
 
     NUM_FEATURES = 2519
 
-    def __init__(self, opp_agent, options=None):
+    def __init__(self, opp_agent, options=None, log=False):
         self.action_space = spaces.Discrete(len(ALL_ACTIONS))
 
         # TODO: Figure out what this observation space should look like
@@ -36,6 +44,7 @@ class ShowdownEnv(Env):
         self.client = ShowdownClient()
         self.opp_agent = opp_agent
         self.options = options or {}
+        self.log = log
 
         self.initial_battle_id = None
         self.current_battle = None
@@ -72,6 +81,18 @@ class ShowdownEnv(Env):
         assert not sides[1]["choiceError"], sides[1]["choiceError"]
 
         battle_data = payload["data"]
+        agent_mon = battle_data["sides"][0]["pokemon"][0]
+        agent_moves = battle_data["sides"][0]["pokemon"][0]["moves"]
+        opp_mon = battle_data["sides"][1]["pokemon"][0]
+        opp_moves = battle_data["sides"][1]["pokemon"][0]["moves"]
+        if self.log:
+            logger.info(", ".join([str(move) for move in moves]))
+            logger.info(agent_mon["species"] + ", " + str(agent_mon["hp"]) + "/" + str(agent_mon["maxhp"]))
+            logger.info(", ".join([move["id"] for move in agent_moves]))
+            logger.info(opp_mon["species"] + ", " + str(opp_mon["hp"]) + "/" + str(opp_mon["maxhp"]))
+            logger.info(", ".join([move["id"] for move in opp_moves]))
+            if "winner" in battle_data:
+                logger.info(battle_data["winner"] + " wins!")
 
         features = self._get_features(battle_data, payload["actions"])
         reward = self._get_reward(battle_data)
@@ -99,6 +120,8 @@ class ShowdownEnv(Env):
 
     def close(self):
         if self.initial_battle_id is not None:
+            if self.log:
+                logger.info("Ending battle %s", self.initial_battle_id)
             self.client.remove_battle(self.initial_battle_id)
             self.initial_battle_id = None
             self.current_battle = None
@@ -118,7 +141,7 @@ class ShowdownEnv(Env):
         weather_onehot = self.weather_ohe.transform([[battle_data["weather"]]])
         side_features = [self._get_side_features(side) for side in battle_data["sides"]]
         features = np.concatenate([*terrain_onehot, *weather_onehot, *side_features])
-        assert (features >= 0).all() and (features <= 1).all()
+        features = np.clip(features, 0, 1)
 
         # Mask out valid actions
         action_mask = np.zeros(len(ALL_ACTIONS))
