@@ -9,7 +9,16 @@ import random
 from sklearn.preprocessing import OneHotEncoder
 
 from .showdown_client import ShowdownClient
-from .data import ALL_ACTIONS, TERRAINS, WEATHERS, STATUSES, GENDERS, TYPES, CATEGORIES, TARGETS
+from .data import (
+    ALL_ACTIONS,
+    TERRAINS,
+    WEATHERS,
+    STATUSES,
+    GENDERS,
+    TYPES,
+    CATEGORIES,
+    TARGETS,
+)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -22,8 +31,9 @@ logger.addHandler(handler)
 
 
 def fit_ohe(categories):
-        ohe = OneHotEncoder(sparse=False, handle_unknown='ignore')
-        return ohe.fit(np.reshape(categories, (-1, 1)))
+    ohe = OneHotEncoder(sparse=False, handle_unknown="ignore")
+    return ohe.fit(np.reshape(categories, (-1, 1)))
+
 
 class ShowdownEnv(Env):
     """
@@ -57,7 +67,7 @@ class ShowdownEnv(Env):
         self.category_ohe = fit_ohe(CATEGORIES)
         self.target_ohe = fit_ohe(TARGETS)
 
-    def render(self, mode):
+    def render(self, mode="ansi"):
         if mode == "ansi":
             log = self.current_battle["data"]["inputLog"]
             return "\n".join(log)
@@ -87,9 +97,21 @@ class ShowdownEnv(Env):
         opp_moves = battle_data["sides"][1]["pokemon"][0]["moves"]
         if self.log:
             logger.info(", ".join([str(move) for move in moves]))
-            logger.info(agent_mon["species"] + ", " + str(agent_mon["hp"]) + "/" + str(agent_mon["maxhp"]))
+            logger.info(
+                agent_mon["species"]
+                + ", "
+                + str(agent_mon["hp"])
+                + "/"
+                + str(agent_mon["maxhp"])
+            )
             logger.info(", ".join([move["id"] for move in agent_moves]))
-            logger.info(opp_mon["species"] + ", " + str(opp_mon["hp"]) + "/" + str(opp_mon["maxhp"]))
+            logger.info(
+                opp_mon["species"]
+                + ", "
+                + str(opp_mon["hp"])
+                + "/"
+                + str(opp_mon["maxhp"])
+            )
             logger.info(", ".join([move["id"] for move in opp_moves]))
             if "winner" in battle_data:
                 logger.info(battle_data["winner"] + " wins!")
@@ -197,7 +219,9 @@ class ShowdownEnv(Env):
         if move_data is None:
             return np.zeros((41,))
 
-        accuracy = 1 if type(move_data["accuracy"]) == bool else move_data["accuracy"] / 100
+        accuracy = (
+            1 if type(move_data["accuracy"]) == bool else move_data["accuracy"] / 100
+        )
         category_onehot = self.category_ohe.transform([[move_data["category"]]])
         target_onehot = self.target_ohe.transform([[move_data["target"]]])
         type_onehot = self.type_ohe.transform([[move_data["type"]]])
