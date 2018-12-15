@@ -21,7 +21,7 @@ STATUSES = ["brn", "par", "slp", "frz", "psn", "tox"]
 GENDERS = ["M", "F", "N"]
 TYPES = [
     "Bug",
-    "Datk",
+    "Dark",
     "Dragon",
     "Electric",
     "Fairy",

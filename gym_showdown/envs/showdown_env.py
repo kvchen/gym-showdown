@@ -20,15 +20,6 @@ from .data import (
     TARGETS,
 )
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-current_time = int(time.time())
-handler = logging.FileHandler(f"moves_{current_time}.log")
-handler.setLevel(logging.INFO)
-formatter = logging.Formatter("%(asctime)s - %(message)s")
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-
 
 def fit_ohe(categories):
     ohe = OneHotEncoder(sparse=False, handle_unknown="ignore")
@@ -41,7 +32,7 @@ class ShowdownEnv(Env):
     OpenAI gym environment.
     """
 
-    NUM_FEATURES = 2519
+    NUM_FEATURES = 1847
 
     def __init__(self, opp_agent, options=None, log=False):
         self.action_space = spaces.Discrete(len(ALL_ACTIONS))
@@ -54,7 +45,6 @@ class ShowdownEnv(Env):
         self.client = ShowdownClient()
         self.opp_agent = opp_agent
         self.options = options or {}
-        self.log = log
 
         self.initial_battle_id = None
         self.current_battle = None
@@ -91,31 +81,6 @@ class ShowdownEnv(Env):
         assert not sides[1]["choiceError"], sides[1]["choiceError"]
 
         battle_data = payload["data"]
-        agent_mon = battle_data["sides"][0]["pokemon"][0]
-        agent_moves = battle_data["sides"][0]["pokemon"][0]["moves"]
-        opp_mon = battle_data["sides"][1]["pokemon"][0]
-        opp_moves = battle_data["sides"][1]["pokemon"][0]["moves"]
-        if self.log:
-            logger.info(", ".join([str(move) for move in moves]))
-            logger.info(
-                agent_mon["species"]
-                + ", "
-                + str(agent_mon["hp"])
-                + "/"
-                + str(agent_mon["maxhp"])
-            )
-            logger.info(", ".join([move["id"] for move in agent_moves]))
-            logger.info(
-                opp_mon["species"]
-                + ", "
-                + str(opp_mon["hp"])
-                + "/"
-                + str(opp_mon["maxhp"])
-            )
-            logger.info(", ".join([move["id"] for move in opp_moves]))
-            if "winner" in battle_data:
-                logger.info(battle_data["winner"] + " wins!")
-
         features = self._get_features(battle_data, payload["actions"])
         reward = self._get_reward(battle_data)
         is_terminal = self._is_terminal(battle_data)
@@ -142,8 +107,6 @@ class ShowdownEnv(Env):
 
     def close(self):
         if self.initial_battle_id is not None:
-            if self.log:
-                logger.info("Ending battle %s", self.initial_battle_id)
             self.client.remove_battle(self.initial_battle_id)
             self.initial_battle_id = None
             self.current_battle = None
@@ -171,17 +134,17 @@ class ShowdownEnv(Env):
         return features, action_mask[None, :]
 
     def _get_side_features(self, side_data):
-        pokemon_features = [
-            self._get_pokemon_features(pokemon) for pokemon in side_data["pokemon"]
-        ]
-        return np.concatenate(pokemon_features)
+        return np.concatenate(
+            [self._get_pokemon_features(pokemon) for pokemon in side_data["pokemon"]]
+        )
 
     def _get_pokemon_features(self, pokemon_data):
         moves = pokemon_data["moves"]
+        stats = pokemon_data["stats"]
+
         move_features = [
             self._get_move_features(move) for move in moves + [None] * (4 - len(moves))
         ]
-        stats = pokemon_data["stats"]
         boosts = [(boost + 6) / 12 for boost in pokemon_data["boosts"].values()]
 
         status_onehot = self.status_ohe.transform([[pokemon_data["status"]]])
@@ -192,6 +155,7 @@ class ShowdownEnv(Env):
         # TODO: Add speciesnum, abilitynum, itemnum
         return np.concatenate(
             [
+                type_onehot,
                 [
                     pokemon_data["hp"] / 714,
                     pokemon_data["maxhp"] / 714,
@@ -210,20 +174,19 @@ class ShowdownEnv(Env):
                 ],
                 *status_onehot,
                 *gender_onehot,
-                type_onehot,
                 *move_features,
             ]
         )
 
     def _get_move_features(self, move_data):
         if move_data is None:
-            return np.zeros((41,))
+            return np.zeros((27,))
 
         accuracy = (
             1 if type(move_data["accuracy"]) == bool else move_data["accuracy"] / 100
         )
         category_onehot = self.category_ohe.transform([[move_data["category"]]])
-        target_onehot = self.target_ohe.transform([[move_data["target"]]])
+        # target_onehot = self.target_ohe.transform([[move_data["target"]]])
         type_onehot = self.type_ohe.transform([[move_data["type"]]])
 
         # TODO: Add movenum
@@ -232,24 +195,19 @@ class ShowdownEnv(Env):
                 [
                     accuracy,
                     move_data["basePower"] / 250,
-                    np.clip((move_data["priority"] + 7) / 14, 0, 1),
+                    (move_data["priority"] + 7) / 14,
                     move_data["pp"] / 64,
                     move_data["maxpp"] / 64,
                     move_data["disabled"],
                 ],
                 *category_onehot,
-                *target_onehot,
+                # *target_onehot,
                 *type_onehot,
             ]
         )
 
     def _get_reward(self, battle_data):
-        """
-        """
         if not self._is_terminal(battle_data) or "winner" not in battle_data:
             return 0
 
         return 1 if battle_data["winner"] == "Player 1" else -1
-
-    def _has_choice_error(self, battle_data):
-        pass
